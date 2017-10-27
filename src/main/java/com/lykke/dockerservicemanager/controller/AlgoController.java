@@ -1,8 +1,8 @@
-package com.lykke.dockerservicemanager.controller;
+package net.itransformers.dockerservicemanager.controller;
 
-import com.lykke.dockerservicemanager.api.AlgoContainerManager;
-import com.lykke.dockerservicemanager.api.AlgoImageManager;
-import com.lykke.dockerservicemanager.model.AlgoType;
+import net.itransformers.dockerservicemanager.api.AlgoContainerManager;
+import net.itransformers.dockerservicemanager.api.AlgoImageManager;
+import net.itransformers.dockerservicemanager.model.AlgoType;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,9 +29,9 @@ public class AlgoController {
     AlgoContainerManager algoContainerManager;
 
 
-    @RequestMapping(value = "/build", method= RequestMethod.POST, consumes = "text/plain")
+    @RequestMapping(value = "/build", method= RequestMethod.POST)
 
-    public String buildAlgoImage(@RequestBody String appCode, @RequestParam AlgoType algoType, @RequestParam String algoUser,@RequestParam String algoName,@RequestParam String algoVersion){
+    public String buildAlgoImage(@RequestBody String appCode, @RequestParam String algoType, @RequestParam String algoUser,@RequestParam String algoName,@RequestParam String algoVersion){
 
         String algoUserDirName = algoUser+"-"+algoName+"-"+algoVersion;
         File baseDirectory = new File("/tmp"+File.separator+algoUserDirName);
@@ -41,26 +41,36 @@ public class AlgoController {
 
         File dockerFileTemplate = null;
         File dockerFilePath = null;
+        File appFile = null;
+
+        switch (AlgoType.valueOf(algoName))
+        {
+            case Java :   dockerFileTemplate = new File(".", "DockerFile.java");
+                          appFile = new File(baseDirectory,"Main.java");
+                          break;
+            case DotNet : dockerFileTemplate = new File(".", "DockerFile.dotnet");
+                          appFile = new File(baseDirectory,"Main.dotnet");
+                          break;
+            default :     logger.error("UnSupported Input Type: "+ algoType + " . The supported Input Type are: Java, DotNet, Python");
+                          break;
+        }
+
+
         try {
-
-            dockerFileTemplate = new File(".","DockerFile.java");
-            dockerFilePath = new File(baseDirectory,"Dockerfile");
-            FileUtils.copyFile(dockerFileTemplate, dockerFilePath);
-
+             dockerFilePath = new File(baseDirectory, "Dockerfile");
+             FileUtils.copyFile(dockerFileTemplate, dockerFilePath);
+            
         } catch (IOException e) {
             logger.error("Can't copy "+ dockerFileTemplate.getAbsolutePath()  + " to "+dockerFilePath.getAbsolutePath());
         }
 
-        File appFile = null;
-        if (algoType.toString().equals(AlgoType.Java.toString())){
             try {
-                appFile = new File(baseDirectory,"Main.java");
                 appFile.createNewFile();
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+
         try {
             FileUtils.writeStringToFile(appFile, appCode);
 
@@ -69,7 +79,7 @@ public class AlgoController {
         }
 
         String imageId = dockerImageManager.build(baseDirectory,dockerFilePath);
-        String tag = algoUser+"-"+algoName+"-"+algoVersion;
+        String tag = algoUserDirName;
         String repo = "hub.itransformers.net/algos";
         dockerImageManager.tag(imageId,repo, tag);
         dockerImageManager.push(imageId, algoUser, tag);
@@ -77,44 +87,16 @@ public class AlgoController {
 
     }
 
-    @RequestMapping(value = "/test/create", method= RequestMethod.PUT)
+    @RequestMapping(value = "/test", method= RequestMethod.PUT)
 
     public String testAlgo(@RequestParam String imageId,@RequestParam String name, @RequestParam String appKey){
         String containerId = algoContainerManager.create(imageId,name, appKey);
+        algoContainerManager.start(containerId);
         return containerId;
 
     }
 
-
-    @RequestMapping(value = "/test/{id}/start", method= RequestMethod.PUT)
-
-    public void start(@PathVariable String id){
-        algoContainerManager.start(id);
-
-    }
-
-    @RequestMapping(value = "/test/{id}/pause", method= RequestMethod.PUT)
-
-    public void pauseTestAlgo(@PathVariable String id){
-         algoContainerManager.pause(id);
-
-    }
-
-    @RequestMapping(value = "/test/{id}/resume", method= RequestMethod.PUT)
-
-    public void resumeTestAlgo(@PathVariable String id){
-        algoContainerManager.resume(id);
-
-    }
-
-    @RequestMapping(value = "/test/{id}/stop", method= RequestMethod.PUT)
-
-    public void stopTestAlgo(@RequestParam String id){
-        algoContainerManager.stop(id);
-
-    }
-
-    @RequestMapping(value = "/test/{id}/getLog", method= RequestMethod.GET)
+    @RequestMapping(value = "/getLog/{id}", method= RequestMethod.GET)
 
     public String getAlgoLog(String id){
 
@@ -122,5 +104,5 @@ public class AlgoController {
     }
 
 
-/// test
+
 }
