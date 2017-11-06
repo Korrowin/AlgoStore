@@ -41,26 +41,37 @@ public class AlgoController {
 
         File dockerFileTemplate = null;
         File dockerFilePath = null;
-        try {
+        File appFile = null;
 
-            dockerFileTemplate = new File(".","DockerFile.java");
-            dockerFilePath = new File(baseDirectory,"Dockerfile");
+        switch (AlgoType.valueOf(algoName))
+        {
+            case Java :   dockerFileTemplate = new File(".", "DockerFile.java");
+                appFile = new File(baseDirectory,"Main.java");
+                break;
+            case DotNet : dockerFileTemplate = new File(".", "DockerFile.dotnet");
+                appFile = new File(baseDirectory,"Main.dotnet");
+                break;
+            //case Python : dockerFileTemplate = new File(".", "DockerFile.python");
+            //              appFile = new File(baseDirectory,"Main.python");
+            default :     logger.error("UnSupported Input Type: "+ algoType + " . The supported Input Type are: Java, DotNet, Python");
+                break;
+        }
+
+        try {
+            dockerFilePath = new File(baseDirectory, "Dockerfile");
             FileUtils.copyFile(dockerFileTemplate, dockerFilePath);
 
         } catch (IOException e) {
             logger.error("Can't copy "+ dockerFileTemplate.getAbsolutePath()  + " to "+dockerFilePath.getAbsolutePath());
         }
 
-        File appFile = null;
-        if (algoType.toString().equals(AlgoType.Java.toString())){
-            try {
-                appFile = new File(baseDirectory,"Main.java");
-                appFile.createNewFile();
+        try {
+            appFile.createNewFile();
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
         try {
             FileUtils.writeStringToFile(appFile, appCode);
 
@@ -69,7 +80,7 @@ public class AlgoController {
         }
 
         String imageId = dockerImageManager.build(baseDirectory,dockerFilePath);
-        String tag = algoUser+"-"+algoName+"-"+algoVersion;
+        String tag = algoUserDirName;
         String repo = "hub.itransformers.net/algos";
         dockerImageManager.tag(imageId,repo, tag);
         dockerImageManager.push(imageId, algoUser, tag);
@@ -121,6 +132,5 @@ public class AlgoController {
         return    algoContainerManager.getLog(id);
     }
 
-
-/// test
+    
 }
